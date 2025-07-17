@@ -1,0 +1,8 @@
+
+grpc:
+  server:
+    port: 9090
+  clients:
+    greeter:
+      address: localhost
+      port: 9090
