@@ -4,31 +4,40 @@ import com.xhk.grpc.spring.annotation.GrpcProxy;
 import io.grpc.stub.AbstractStub;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 
+// BeanPostProcessor tự động inject GrpcStubProxy vào các field dùng @GrpcProxy
+// Đảm bảo đúng kiểu, đúng generic, và inject đúng stub manager
 @Component
+@DependsOn("grpcStubManager")
 public class GrpcProxyInjector implements BeanPostProcessor {
 
+    // Quản lý lifecycle channel/stub
     private final GrpcStubManager stubManager;
 
     public GrpcProxyInjector(GrpcStubManager stubManager) {
         this.stubManager = stubManager;
     }
 
+    /**
+     * Trước khi khởi tạo bean, kiểm tra và inject GrpcStubProxy vào các field có @GrpcProxy
+     */
     @Override
     public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
-
         for (Field field : bean.getClass().getDeclaredFields()) {
             GrpcProxy annotation = field.getAnnotation(GrpcProxy.class);
             if (annotation == null) continue;
 
-            if (!SafeGrpcCaller.class.isAssignableFrom(field.getType())) {
+            // Kiểm tra đúng kiểu GrpcStubProxy
+            if (!GrpcStubProxy.class.isAssignableFrom(field.getType())) {
                 throw new IllegalArgumentException("@GrpcProxy only supports SafeGrpcCaller<T>");
             }
 
+            // Kiểm tra generic đúng kiểu stub
             if (!(field.getGenericType() instanceof ParameterizedType type)) {
                 throw new IllegalArgumentException("SafeGrpcCaller must be parameterized");
             }
@@ -38,9 +47,12 @@ public class GrpcProxyInjector implements BeanPostProcessor {
                 throw new IllegalArgumentException("Stub must extend AbstractStub");
             }
 
-            SafeGrpcCaller<?> caller = new SafeGrpcCaller<>(
+            @SuppressWarnings("unchecked")
+            Class<? extends AbstractStub<?>> castedStubClass = (Class<? extends AbstractStub<?>>) stubClass;
+            // Tạo GrpcStubProxy và inject vào field
+            GrpcStubProxy<?> caller = new GrpcStubProxy<>(
                     annotation.service(),
-                    stubClass,
+                    castedStubClass,
                     stubManager
             );
 

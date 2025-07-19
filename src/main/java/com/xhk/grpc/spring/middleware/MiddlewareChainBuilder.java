@@ -1,12 +1,12 @@
-package com.xhk.grpc.spring.injector;
+package com.xhk.grpc.spring.middleware;
 
 
-import com.xhk.grpc.spring.middleware.Middleware;
 import org.springframework.context.ApplicationContext;
 
 import java.util.ArrayList;
 import java.util.List;
 
+// Utility build danh sách middleware từ class, hỗ trợ lấy bean từ Spring context hoặc tạo mới
 public class MiddlewareChainBuilder {
     public static List<Middleware> build(Class<? extends Middleware>[] middlewareClasses, ApplicationContext ctx) throws Exception {
         List<Middleware> chain = new ArrayList<>();

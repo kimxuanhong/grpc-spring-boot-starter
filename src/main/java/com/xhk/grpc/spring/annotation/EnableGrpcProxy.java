@@ -1,4 +1,4 @@
-package com.xhk.grpc.spring.config;
+package com.xhk.grpc.spring.annotation;
 
 import org.springframework.context.annotation.ComponentScan;
 
@@ -8,10 +8,12 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+// Annotation để bật auto scan và inject các field dùng @GrpcProxy
+// Đánh dấu trên class Application để enable tính năng proxy client
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@ComponentScan(basePackages = "com.xhk.grpc.spring")
+@ComponentScan(basePackages = {"com.xhk.grpc.spring.injector", "com.xhk.grpc.spring.config"})
 public @interface EnableGrpcProxy {
 }
 

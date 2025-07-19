@@ -4,6 +4,8 @@ import io.grpc.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+// Interceptor server gRPC để log thông tin request/response
+// Dùng cho mục đích audit, debug, trace...
 public class ServerLoggingInterceptor implements ServerInterceptor {
     private static final Logger logger = LogManager.getLogger(ServerLoggingInterceptor.class);
 
