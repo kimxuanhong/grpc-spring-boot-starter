@@ -1,6 +1,6 @@
 package com.xhk.grpc.spring.injector;
 
-import com.xhk.grpc.spring.config.GrpcChannel;
+import com.xhk.grpc.spring.config.GrpcChannelConfig;
 import io.grpc.ClientInterceptor;
 import io.grpc.ConnectivityState;
 import io.grpc.ManagedChannel;
@@ -8,8 +8,11 @@ import io.grpc.ManagedChannelBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Role;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -18,36 +21,62 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.lang.reflect.Method;
 
-@Component
+// Quản lý lifecycle của các gRPC stub và channel, đảm bảo channel luôn healthy, tự động set timeout cho stub nếu có cấu hình
+@Component(value = "grpcStubManager")
+@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 public class GrpcStubManager implements DisposableBean, ApplicationContextAware {
 
+    // Logger cho debug, log trạng thái channel
     private static final Logger logger = LogManager.getLogger(GrpcStubManager.class);
 
+    // Spring context để lấy bean cấu hình channel
     private ApplicationContext context;
 
+    // Cache các ManagedChannel theo tên cấu hình (beanName)
     private final Map<String, ManagedChannel> channelCache = new ConcurrentHashMap<>();
+    // Executor để monitor trạng thái channel định kỳ
     private final ScheduledExecutorService monitorExecutor = Executors.newSingleThreadScheduledExecutor();
 
+    // Khởi tạo, bắt đầu monitor channel
     public GrpcStubManager() {
         monitorExecutor.scheduleAtFixedRate(this::monitorChannels, 10, 10, TimeUnit.SECONDS);
         logger.info("GrpcStubManager initialized with background monitoring.");
     }
 
+    /**
+     * Lấy stub cho một service cụ thể, tự động set timeout nếu có cấu hình
+     * @param stubClass class của stub (BlockingStub, FutureStub...)
+     * @param channelCfgBeanName tên bean cấu hình channel
+     * @return stub đã được set timeout nếu có
+     */
     @SuppressWarnings("unchecked")
     public <T> T getStub(Class<T> stubClass, String channelCfgBeanName) {
-        GrpcChannel config = context.getBean(channelCfgBeanName, GrpcChannel.class);
+        GrpcChannelConfig config = context.getBean(channelCfgBeanName, GrpcChannelConfig.class);
         ManagedChannel channel = getOrCreateHealthyChannel(channelCfgBeanName, config);
 
         try {
-            Object stub = StubCreator.create(stubClass, channel);
+            Object stub = GrpcStubCreator.create(stubClass, channel);
+            // Nếu có timeout, set timeout cho stub
+            if (config.getTimeoutSeconds() != null && config.getTimeoutSeconds() > 0) {
+                try {
+                    Method withDeadlineAfter = stub.getClass().getMethod("withDeadlineAfter", long.class, java.util.concurrent.TimeUnit.class);
+                    stub = withDeadlineAfter.invoke(stub, config.getTimeoutSeconds(), java.util.concurrent.TimeUnit.SECONDS);
+                } catch (NoSuchMethodException e) {
+                    // Nếu stub không có method này thì bỏ qua
+                }
+            }
             return (T) stub;
         } catch (Exception e) {
             throw new IllegalStateException("Failed to create gRPC stub for " + stubClass.getSimpleName(), e);
         }
     }
 
-    private ManagedChannel getOrCreateHealthyChannel(String beanName, GrpcChannel config) {
+    /**
+     * Lấy hoặc tạo mới ManagedChannel, đảm bảo channel luôn healthy
+     */
+    private ManagedChannel getOrCreateHealthyChannel(String beanName, GrpcChannelConfig config) {
         ManagedChannel existing = channelCache.get(beanName);
 
         if (existing != null && !existing.isShutdown() && !existing.isTerminated()) {
@@ -77,6 +106,9 @@ public class GrpcStubManager implements DisposableBean, ApplicationContextAware 
         return newChannel;
     }
 
+    /**
+     * Monitor trạng thái các channel, tự động shutdown và xóa channel lỗi
+     */
     private void monitorChannels() {
         for (Map.Entry<String, ManagedChannel> entry : channelCache.entrySet()) {
             String name = entry.getKey();
@@ -96,6 +128,9 @@ public class GrpcStubManager implements DisposableBean, ApplicationContextAware 
         }
     }
 
+    /**
+     * Shutdown channel và xóa khỏi cache
+     */
     private void shutdownChannel(String beanName, ManagedChannel channel) {
         try {
             if (!channel.isShutdown()) {
@@ -109,6 +144,9 @@ public class GrpcStubManager implements DisposableBean, ApplicationContextAware 
         }
     }
 
+    /**
+     * Thủ công refresh channel (shutdown và tạo lại ở lần gọi tiếp theo)
+     */
     public void refreshChannel(String beanName) {
         ManagedChannel channel = channelCache.remove(beanName);
         if (channel != null && !channel.isShutdown()) {
@@ -117,6 +155,9 @@ public class GrpcStubManager implements DisposableBean, ApplicationContextAware 
         }
     }
 
+    /**
+     * Đóng toàn bộ channel khi shutdown ứng dụng
+     */
     @Override
     public void destroy() {
         logger.info("GrpcStubManager shutting down...");
@@ -140,6 +181,9 @@ public class GrpcStubManager implements DisposableBean, ApplicationContextAware 
         logger.info("All channels shut down and cache cleared.");
     }
 
+    /**
+     * Inject Spring context
+     */
     @Override
     public void setApplicationContext(ApplicationContext applicationContext) {
         this.context = applicationContext;

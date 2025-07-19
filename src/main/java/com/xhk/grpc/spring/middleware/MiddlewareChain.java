@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+// Quản lý chuỗi middleware, cho phép thực thi tuần tự các middleware trên request/response
+// Dùng cho cả client và server để xử lý logic trước/sau khi gọi stub/service
 public class MiddlewareChain<ReqT, RespT> implements MiddlewareContext<ReqT, RespT> {
     private final List<Middleware> middlewares = new ArrayList<>();
     private int index = 0;

@@ -2,6 +2,8 @@ package com.xhk.grpc.spring.server;
 
 import com.xhk.grpc.spring.annotation.GrpcController;
 import com.xhk.grpc.spring.config.GrpcProperties;
+import com.xhk.grpc.spring.service.HealthServiceDefault;
+import com.xhk.grpc.spring.service.HealthServiceType;
 import io.grpc.BindableService;
 import io.grpc.Server;
 import io.grpc.ServerInterceptor;
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
+// Runner khởi động gRPC server trong Spring Boot, quản lý lifecycle server
+// Tự động scan và đăng ký các controller/service gRPC
 @Component
 public class GrpcServerRunner implements CommandLineRunner {
 
@@ -54,6 +58,11 @@ public class GrpcServerRunner implements CommandLineRunner {
 
                 registeredServices++;
             }
+        }
+
+        if (context.getBeansOfType(HealthServiceType.class).isEmpty()) {
+            builder.addService(new HealthServiceDefault(this));
+            logger.info("Registered default HealthService");
         }
 
         if (registeredServices == 0) {

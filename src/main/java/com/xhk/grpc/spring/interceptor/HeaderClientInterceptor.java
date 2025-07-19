@@ -2,6 +2,8 @@ package com.xhk.grpc.spring.interceptor;
 
 import io.grpc.*;
 
+// Interceptor client gRPC để thêm/chỉnh sửa header cho mỗi request
+// Dùng cho mục đích auth, trace, custom header...
 public abstract class HeaderClientInterceptor implements ClientInterceptor {
     /**
      * Subclasses must implement this to modify the headers as needed.
