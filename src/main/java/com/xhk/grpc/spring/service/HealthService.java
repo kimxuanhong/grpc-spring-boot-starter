@@ -34,10 +34,7 @@ public abstract class HealthService extends HealthGrpc.HealthImplBase implements
         responseObserver.onCompleted();
     }
 
-    protected boolean livenessCheck() {
-        logger.debug("Default livenessCheck called, always returns true. Override for custom logic.");
-        return true;
-    }
+    protected abstract boolean livenessCheck();
 
     @Override
     public void readiness(HealthCheckRequest request, StreamObserver<HealthCheckResponse> responseObserver) {
@@ -54,10 +51,7 @@ public abstract class HealthService extends HealthGrpc.HealthImplBase implements
         responseObserver.onCompleted();
     }
 
-    protected boolean connectionCheck() {
-        logger.debug("Default connectionCheck called, always returns true. Override for DB/cache check.");
-        return true;
-    }
+    protected abstract boolean connectionCheck();
 
     @Override
     public void terminate(HealthCheckRequest request, StreamObserver<HealthCheckResponse> responseObserver) {
@@ -75,7 +69,6 @@ public abstract class HealthService extends HealthGrpc.HealthImplBase implements
         grpcServerRunner.shutdown();
     }
 
-    protected void shutdownGraceful() {
-        logger.debug("Default shutdownGraceful called. Override to cleanup resources.");
-    }
+    protected abstract void shutdownGraceful();
+
 }
