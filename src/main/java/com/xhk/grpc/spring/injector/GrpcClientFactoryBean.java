@@ -1,8 +1,9 @@
 package com.xhk.grpc.spring.injector;
 
 import com.xhk.grpc.spring.annotation.GrpcClient;
+import com.xhk.grpc.spring.middleware.Context;
 import com.xhk.grpc.spring.middleware.Middleware;
-import com.xhk.grpc.spring.middleware.MiddlewareChainBuilder;
+import com.xhk.grpc.spring.middleware.MiddlewareBeanBuilder;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -36,7 +37,7 @@ public class GrpcClientFactoryBean<T> implements FactoryBean<T> {
     public T getObject() {
         try {
             Object stub = stubManager.getStub(annotation.stub(), annotation.service());
-            List<Middleware> middlewares = MiddlewareChainBuilder.build(annotation.middlewares(), ctx);
+            List<Middleware<Context<Object, Object>>> middlewares = MiddlewareBeanBuilder.build(annotation.middlewares(), ctx);
             return create(grpcInterface, stub, middlewares);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to create gRPC stub for " + annotation.stub().getSimpleName(), e);
@@ -47,7 +48,7 @@ public class GrpcClientFactoryBean<T> implements FactoryBean<T> {
      * Tạo proxy instance với middleware chain
      */
     @SuppressWarnings("unchecked")
-    public static <T> T create(Class<T> grpcInterface, Object stub, List<Middleware> middlewares) {
+    public static <T> T create(Class<T> grpcInterface, Object stub, List<Middleware<Context<Object, Object>>> middlewares) {
         return (T) Proxy.newProxyInstance(
                 grpcInterface.getClassLoader(),
                 new Class[]{grpcInterface},

@@ -11,7 +11,6 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Role;
 import org.springframework.stereotype.Component;
 
@@ -21,7 +20,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.lang.reflect.Method;
 
 // Quản lý lifecycle của các gRPC stub và channel, đảm bảo channel luôn healthy, tự động set timeout cho stub nếu có cấu hình
 @Component(value = "grpcStubManager")
@@ -47,7 +45,8 @@ public class GrpcStubManager implements DisposableBean, ApplicationContextAware 
 
     /**
      * Lấy stub cho một service cụ thể, tự động set timeout nếu có cấu hình
-     * @param stubClass class của stub (BlockingStub, FutureStub...)
+     *
+     * @param stubClass          class của stub (BlockingStub, FutureStub...)
      * @param channelCfgBeanName tên bean cấu hình channel
      * @return stub đã được set timeout nếu có
      */
@@ -58,15 +57,6 @@ public class GrpcStubManager implements DisposableBean, ApplicationContextAware 
 
         try {
             Object stub = GrpcStubCreator.create(stubClass, channel);
-            // Nếu có timeout, set timeout cho stub
-            if (config.getTimeoutSeconds() != null && config.getTimeoutSeconds() > 0) {
-                try {
-                    Method withDeadlineAfter = stub.getClass().getMethod("withDeadlineAfter", long.class, java.util.concurrent.TimeUnit.class);
-                    stub = withDeadlineAfter.invoke(stub, config.getTimeoutSeconds(), java.util.concurrent.TimeUnit.SECONDS);
-                } catch (NoSuchMethodException e) {
-                    // Nếu stub không có method này thì bỏ qua
-                }
-            }
             return (T) stub;
         } catch (Exception e) {
             throw new IllegalStateException("Failed to create gRPC stub for " + stubClass.getSimpleName(), e);

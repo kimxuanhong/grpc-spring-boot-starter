@@ -12,11 +12,14 @@ import java.util.function.Supplier;
 // Được inject qua @GrpcProxy để sử dụng client gRPC dạng functional/lambda
 public class GrpcStubProxy<T extends AbstractStub<?>> {
     // Tên bean cấu hình channel (GrpcChannelConfig)
-    private final String service;
+    private String service;
     // Class stub gốc (BlockingStub, FutureStub...)
-    private final Class<T> stubClass;
+    private Class<T> stubClass;
     // Quản lý lifecycle channel/stub
-    private final GrpcStubManager stubManager;
+    private GrpcStubManager stubManager;
+
+    public GrpcStubProxy() {
+    }
 
     // Khởi tạo proxy với thông tin channel, stub, manager
     public GrpcStubProxy(String service, Class<T> stubClass, GrpcStubManager stubManager) {
@@ -27,6 +30,7 @@ public class GrpcStubProxy<T extends AbstractStub<?>> {
 
     /**
      * Gọi hàm trên stub, tự động retry nếu gặp lỗi UNAVAILABLE (channel lỗi)
+     *
      * @param fn lambda nhận stub và trả về kết quả
      * @return kết quả trả về từ stub
      */
