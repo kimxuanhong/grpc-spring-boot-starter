@@ -17,13 +17,13 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-// Runner khởi động gRPC server trong Spring Boot, quản lý lifecycle server
-// Tự động scan và đăng ký các controller/service gRPC
 @Component
 public class GrpcServerRunner implements SmartLifecycle {
 
     private static final Logger logger = LogManager.getLogger(GrpcServerRunner.class);
+    private static final int GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS = 30;
 
     private final ApplicationContext context;
     private final GrpcProperties grpcProperties;
@@ -61,6 +61,9 @@ public class GrpcServerRunner implements SmartLifecycle {
                     }
 
                     registeredServices++;
+                } else {
+                    logger.warn("Bean {} is annotated with @GrpcController but does not implement BindableService",
+                            bean.getClass().getSimpleName());
                 }
             }
 
@@ -85,21 +88,44 @@ public class GrpcServerRunner implements SmartLifecycle {
                     server.awaitTermination();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    logger.info("gRPC server await thread interrupted");
                 }
             }, "grpc-server-await-thread");
             awaitThread.setDaemon(false); // giữ JVM sống
             awaitThread.start();
 
         } catch (IOException e) {
-            throw new RuntimeException("Failed to start gRPC server", e);
+            logger.error("Failed to start gRPC server on port {}", grpcProperties.getServer().getPort(), e);
+            throw new GrpcServerStartupException("Failed to start gRPC server", e);
+        } catch (Exception e) {
+            logger.error("Unexpected error during gRPC server startup", e);
+            throw new GrpcServerStartupException("Unexpected error during gRPC server startup", e);
         }
     }
 
     @Override
     public void stop() {
         if (server != null && !server.isShutdown()) {
-            server.shutdown();
-            logger.info("gRPC server is shutting down");
+            try {
+                logger.info("Initiating graceful shutdown of gRPC server");
+                server.shutdown();
+
+                // Wait for graceful shutdown
+                if (!server.awaitTermination(GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    logger.warn("gRPC server did not terminate gracefully within {} seconds, forcing shutdown",
+                            GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS);
+                    server.shutdownNow();
+
+                    if (!server.awaitTermination(5, TimeUnit.SECONDS)) {
+                        logger.error("gRPC server did not terminate");
+                    }
+                }
+                logger.info("gRPC server shutdown completed");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.error("Interrupted during gRPC server shutdown", e);
+                server.shutdownNow();
+            }
         }
         running = false;
     }
@@ -137,16 +163,29 @@ public class GrpcServerRunner implements SmartLifecycle {
         for (int i = 0; i < classes.length; i++) {
             try {
                 interceptors[i] = context.getBean(classes[i]);
+                logger.debug("Resolved interceptor from Spring context: {}", classes[i].getSimpleName());
             } catch (Exception e) {
                 try {
                     interceptors[i] = classes[i].getDeclaredConstructor().newInstance();
                     logger.info("Created interceptor by newInstance: {}", classes[i].getSimpleName());
                 } catch (Exception ex) {
-                    throw new RuntimeException("Cannot instantiate interceptor: " + classes[i], ex);
+                    logger.error("Cannot instantiate interceptor: {}", classes[i], ex);
+                    throw new GrpcServerStartupException("Cannot instantiate interceptor: " + classes[i], ex);
                 }
             }
         }
 
         return interceptors;
+    }
+
+    // Custom exception for better error handling
+    public static class GrpcServerStartupException extends RuntimeException {
+        public GrpcServerStartupException(String message) {
+            super(message);
+        }
+
+        public GrpcServerStartupException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 }

@@ -4,12 +4,12 @@ import io.grpc.Channel;
 
 import java.lang.reflect.Method;
 
-// Utility tạo stub gRPC từ ManagedChannel, tự động chọn factory method phù hợp (BlockingStub, FutureStub...)
 public class GrpcStubCreator {
     /**
      * Tạo instance stub từ class stub và channel
+     *
      * @param stubType class stub (BlockingStub, FutureStub...)
-     * @param channel ManagedChannel
+     * @param channel  ManagedChannel
      * @return instance stub
      */
     public static Object create(Class<?> stubType, Channel channel) throws Exception {

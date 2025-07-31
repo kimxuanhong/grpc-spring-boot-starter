@@ -1,11 +1,16 @@
 package com.xhk.grpc.spring.interceptor;
 
-import io.grpc.*;
+import io.grpc.CallOptions;
+import io.grpc.Channel;
+import io.grpc.ClientCall;
+import io.grpc.ClientInterceptor;
+import io.grpc.ForwardingClientCall;
+import io.grpc.ForwardingClientCallListener;
+import io.grpc.Metadata;
+import io.grpc.MethodDescriptor;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-// Interceptor client gRPC để log thông tin request/response
-// Dùng cho mục đích audit, debug, trace...
 public class ClientLoggingInterceptor implements ClientInterceptor {
     private static final Logger logger = LogManager.getLogger(ClientLoggingInterceptor.class);
 

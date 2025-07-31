@@ -1,12 +1,18 @@
 package com.xhk.grpc.spring.interceptor;
 
-import io.grpc.*;
+import io.grpc.CallOptions;
+import io.grpc.Channel;
+import io.grpc.ClientCall;
+import io.grpc.ClientInterceptor;
+import io.grpc.ForwardingClientCall;
+import io.grpc.Metadata;
+import io.grpc.MethodDescriptor;
 
-// Interceptor client gRPC để thêm/chỉnh sửa header cho mỗi request
-// Dùng cho mục đích auth, trace, custom header...
+
 public abstract class HeaderClientInterceptor implements ClientInterceptor {
     /**
      * Subclasses must implement this to modify the headers as needed.
+     *
      * @param headers The gRPC metadata headers to modify.
      */
     protected abstract void applyHeaders(Metadata headers);

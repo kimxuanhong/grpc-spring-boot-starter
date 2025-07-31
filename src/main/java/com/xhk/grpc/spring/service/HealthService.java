@@ -9,8 +9,6 @@ import io.grpc.stub.StreamObserver;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-// Service cơ sở cho health check gRPC (liveness, readiness, terminate)
-// Có thể kế thừa để custom logic kiểm tra sức khỏe microservice
 public abstract class HealthService extends HealthGrpc.HealthImplBase implements HealthServiceType {
     protected final Logger logger = LogManager.getLogger(this.getClass());
     private final GrpcServerRunner grpcServerRunner;
