@@ -10,11 +10,14 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Field;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class GrpcClientInjector implements BeanPostProcessor {
     private static final Logger logger = LogManager.getLogger(GrpcClientInjector.class);
     private final ApplicationContext ctx;
+    private final Map<StubKey, Object> stubCache = new ConcurrentHashMap<>();
 
     public GrpcClientInjector(ApplicationContext ctx) {
         this.ctx = ctx;
@@ -39,13 +42,24 @@ public class GrpcClientInjector implements BeanPostProcessor {
     }
 
     private void injectGrpcClient(Object bean, Field field, GrpcClient annotation) throws Exception {
+        Class<?> stubType = field.getType();
         String serviceName = annotation.service();
 
         if (serviceName == null || serviceName.trim().isEmpty()) {
             throw new GrpcClientInjectionException("Service name cannot be null or empty for field: " + field.getName());
         }
 
-        // Validate that the ManagedChannel bean exists
+        StubKey key = new StubKey(stubType, serviceName);
+
+        // Nếu đã có trong cache thì dùng lại
+        if (stubCache.containsKey(key)) {
+            Object cachedStub = stubCache.get(key);
+            field.setAccessible(true);
+            field.set(bean, cachedStub);
+            logger.debug("Reused cached gRPC client for field {} with type {} and service {}", field.getName(), stubType.getName(), serviceName);
+            return;
+        }
+
         if (!ctx.containsBean(serviceName)) {
             throw new GrpcClientInjectionException(
                     "ManagedChannel bean with name '" + serviceName + "' not found. " +
@@ -53,22 +67,21 @@ public class GrpcClientInjector implements BeanPostProcessor {
         }
 
         ManagedChannel channel = ctx.getBean(serviceName, ManagedChannel.class);
-
-        // Validate channel state
         if (channel.isShutdown()) {
             logger.warn("ManagedChannel '{}' is shutdown", serviceName);
         }
 
-        Object stub = GrpcStubCreator.create(field.getType(), channel);
-
+        Object stub = GrpcStubCreator.create(stubType, channel);
         if (stub == null) {
-            throw new GrpcClientInjectionException("Failed to create stub for type: " + field.getType().getName());
+            throw new GrpcClientInjectionException("Failed to create stub for type: " + stubType.getName());
         }
+
+        // Cache stub
+        stubCache.put(key, stub);
 
         field.setAccessible(true);
         field.set(bean, stub);
-
-        logger.debug("Successfully injected gRPC client for field {} with service {}", field.getName(), serviceName);
+        logger.debug("Created and injected gRPC client for field {} with service {}", field.getName(), serviceName);
     }
 
     @Override
@@ -76,7 +89,6 @@ public class GrpcClientInjector implements BeanPostProcessor {
         return bean;
     }
 
-    // Custom exception for better error handling
     public static class GrpcClientInjectionException extends RuntimeException {
         public GrpcClientInjectionException(String message) {
             super(message);
@@ -86,5 +98,14 @@ public class GrpcClientInjector implements BeanPostProcessor {
             super(message, cause);
         }
     }
-}
 
+    // Helper key class for caching by (Stub class + Service name)
+    private record StubKey(Class<?> stubType, String serviceName) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof StubKey that)) return false;
+            return stubType.equals(that.stubType) && serviceName.equals(that.serviceName);
+        }
+    }
+}

@@ -141,6 +141,18 @@ public class GreeterService extends GreeterGrpc.GreeterImplBase {
 ### 4. Khai báo cấu hình client (ManagedChannel)
 
 ```java
+import com.xhk.grpc.spring.annotation.EnableGrpcClients;
+
+@EnableGrpcClients
+@SpringBootApplication
+public class MyApp {
+    public static void main(String[] args) {
+        SpringApplication.run(MyApp.class, args);
+    }
+}
+```
+
+```java
 @Configuration
 public class GrpcClientConfig {
     
