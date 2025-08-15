@@ -7,17 +7,18 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
 @ConfigurationProperties(prefix = "grpc")
 @Validated
 public class GrpcProperties {
-    
+
     @NotNull
     private Server server = new Server();
-    
-    private Map<String, Client> clients;
+
+    private Map<String, Client> clients = new HashMap<>();
 
     public Server getServer() {
         return server;
@@ -54,13 +55,13 @@ public class GrpcProperties {
     public static class Client {
         @NotBlank(message = "Address cannot be blank")
         private String address = "localhost";
-        
+
         @Min(value = 1, message = "Port must be greater than 0")
         @Min(value = 65535, message = "Port must be less than 65536")
         private int port = 9090;
-        
+
         private Map<String, Object> headers;
-        
+
         // Connection settings
         private int keepAliveTimeMinutes = 1;
         private int keepAliveTimeoutSeconds = 30;
@@ -68,6 +69,8 @@ public class GrpcProperties {
         private int idleTimeoutMinutes = 5;
         private int maxRetryAttempts = 5;
         private boolean usePlaintext = true;
+        private boolean enableDebug = false;
+        private boolean enableRetry = false;
 
         public String getAddress() {
             return address;
@@ -139,6 +142,22 @@ public class GrpcProperties {
 
         public void setUsePlaintext(boolean usePlaintext) {
             this.usePlaintext = usePlaintext;
+        }
+
+        public boolean isEnableDebug() {
+            return enableDebug;
+        }
+
+        public void setEnableDebug(boolean enableDebug) {
+            this.enableDebug = enableDebug;
+        }
+
+        public boolean isEnableRetry() {
+            return enableRetry;
+        }
+
+        public void setEnableRetry(boolean enableRetry) {
+            this.enableRetry = enableRetry;
         }
     }
 }
