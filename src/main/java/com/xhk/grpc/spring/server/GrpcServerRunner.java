@@ -4,10 +4,7 @@ import com.xhk.grpc.spring.annotation.GrpcController;
 import com.xhk.grpc.spring.config.GrpcProperties;
 import com.xhk.grpc.spring.service.HealthServiceDefault;
 import com.xhk.grpc.spring.service.HealthServiceType;
-import io.grpc.BindableService;
-import io.grpc.Server;
-import io.grpc.ServerInterceptor;
-import io.grpc.ServerInterceptors;
+import io.grpc.*;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -81,6 +78,8 @@ public class GrpcServerRunner implements SmartLifecycle {
             running = true;
 
             logger.info("gRPC server started on port {}", port);
+
+            printRegisteredServices();
 
             // Giữ server sống bằng luồng riêng (non-daemon)
             Thread awaitThread = new Thread(() -> {
@@ -186,6 +185,24 @@ public class GrpcServerRunner implements SmartLifecycle {
 
         public GrpcServerStartupException(String message, Throwable cause) {
             super(message, cause);
+        }
+    }
+
+    public void printRegisteredServices() {
+        if (server == null) {
+            logger.warn("gRPC server is not started yet.");
+            return;
+        }
+
+        logger.info("📋 Registered gRPC services and methods:");
+        for (ServerServiceDefinition serviceDef : server.getServices()) {
+            String serviceName = serviceDef.getServiceDescriptor().getName();
+            logger.info("  • {}", serviceName);
+
+            serviceDef.getMethods().forEach(method -> {
+                String methodName = method.getMethodDescriptor().getFullMethodName();
+                logger.info("    └─ {}", methodName);
+            });
         }
     }
 }

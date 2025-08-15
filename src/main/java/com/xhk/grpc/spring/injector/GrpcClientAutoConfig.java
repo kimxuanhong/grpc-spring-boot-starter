@@ -2,6 +2,7 @@ package com.xhk.grpc.spring.injector;
 
 import com.xhk.grpc.spring.config.GrpcProperties;
 import com.xhk.grpc.spring.interceptor.ClientLoggingInterceptor;
+import com.xhk.grpc.spring.interceptor.GrpcUtils;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -47,7 +48,7 @@ public class GrpcClientAutoConfig implements BeanDefinitionRegistryPostProcessor
                                 builder.usePlaintext();
                             }
                             if (clientConfig.isEnableDebug()) {
-                                builder.intercept(new ClientLoggingInterceptor());
+                                builder.intercept(GrpcUtils.convert(new ClientLoggingInterceptor()));
                             }
 
                             return builder.build();
